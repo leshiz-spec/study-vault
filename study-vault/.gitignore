@@ -3,3 +3,9 @@ frontend/dist/
 frontend/tsconfig.tsbuildinfo
 backend/target/
 .env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.idea/
+.vscode/
