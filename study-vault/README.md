@@ -15,4 +15,14 @@ cd frontend && npm install && npm run dev
 cd backend && mvn spring-boot:run
 ```
 
-后端提供 `GET /api/health` 与 `GET /api/ready` 健康检查。生产环境请复制 `.env.example` 为 `.env`，再执行 `docker compose -f deploy/docker-compose.yml up -d --build`。
+后端提供 `GET /api/health` 与 `GET /api/ready` 健康检查。
+
+## 生产部署准备
+
+在服务器上复制 `.env.production.example` 为 `.env.production`，填写强密码和至少 32 位的随机 `JWT_SECRET`，然后从 `study-vault/` 目录执行：
+
+```bash
+docker compose --env-file .env.production -f deploy/docker-compose.yml up -d --build
+```
+
+真实的 `.env.production` 已加入 Git 忽略规则，不应提交到仓库。
