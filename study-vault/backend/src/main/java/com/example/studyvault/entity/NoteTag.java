@@ -2,7 +2,7 @@ package com.example.studyvault.entity;
 
 import jakarta.persistence.*;
 
-@Entity @Table(name="note_tags")
+@Entity @Table(name="note_tags", uniqueConstraints=@UniqueConstraint(name="uk_note_tags_note_tag", columnNames={"note_id", "tag_id"}))
 public class NoteTag {
     @EmbeddedId private NoteTagId id;
     @ManyToOne(fetch=FetchType.LAZY, optional=false) @MapsId("noteId") @JoinColumn(name="note_id") private Note note;
