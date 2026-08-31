@@ -21,3 +21,9 @@ management:
         include: health,info
 server:
   port: ${SERVER_PORT:8080}
+studyvault:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:86400}
+  auth-cookie:
+    secure: ${AUTH_COOKIE_SECURE:false}
