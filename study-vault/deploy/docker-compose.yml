@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16-alpine}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-studyvault}
       POSTGRES_USER: ${POSTGRES_USER:-studyvault}
