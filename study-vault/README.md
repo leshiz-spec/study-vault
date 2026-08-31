@@ -17,6 +17,8 @@ cd backend && mvn spring-boot:run
 
 后端提供 `GET /api/health` 与 `GET /api/ready` 健康检查。
 
+容器模式下，Nginx 暴露 `80` 端口并代理 `/api` 请求；例如使用 `curl http://localhost/api/health`。`8080` 是 Docker 内部 backend 端口，不直接暴露到宿主机。
+
 ## 生产部署准备
 
 在服务器上复制 `.env.production.example` 为 `.env.production`，填写强密码和至少 32 位的随机 `JWT_SECRET`，然后从 `study-vault/` 目录执行：

@@ -13,10 +13,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseCookie;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService auth; private final boolean secureCookie;
+    @Autowired
     public AuthController(AuthService auth, @Value("${studyvault.auth-cookie.secure:false}") boolean secureCookie) { this.auth = auth; this.secureCookie = secureCookie; }
     public AuthController(AuthService auth) { this(auth, false); }
     @PostMapping("/register") public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) { return withCookie(auth.register(request)); }

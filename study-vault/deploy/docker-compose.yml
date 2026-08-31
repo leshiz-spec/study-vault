@@ -8,15 +8,22 @@ services:
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     networks: [internal]
   backend:
-    build: ../backend
+    build:
+      context: ../backend
+      args:
+        MAVEN_IMAGE: ${MAVEN_IMAGE:-docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-17}
+        JAVA_IMAGE: ${JAVA_IMAGE:-docker.m.daocloud.io/library/eclipse-temurin:17-jre}
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-studyvault}
       DATABASE_USERNAME: ${POSTGRES_USER:-studyvault}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-studyvault}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env.production or exported}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-86400}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     depends_on: [postgres]
     networks: [internal]
   nginx:
-    image: nginx:1.27-alpine
+    image: ${NGINX_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
     ports: ["80:80"]
     volumes: ["./nginx.conf:/etc/nginx/conf.d/default.conf:ro", "../frontend:/usr/share/nginx/html:ro"]
     depends_on: [backend]
