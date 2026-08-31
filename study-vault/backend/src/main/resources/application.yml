@@ -2,13 +2,18 @@ spring:
   application:
     name: studyvault
   datasource:
-    url: ${DATABASE_URL:jdbc:h2:mem:studyvault}
-    username: ${DATABASE_USERNAME:sa}
-    password: ${DATABASE_PASSWORD:}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/studyvault}
+    username: ${DATABASE_USERNAME:studyvault}
+    # Required at runtime; keep credentials outside source control.
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 management:
   endpoints:
     web:
