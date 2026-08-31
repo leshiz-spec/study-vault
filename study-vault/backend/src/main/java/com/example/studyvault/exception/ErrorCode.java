@@ -1,0 +1,6 @@
+package com.example.studyvault.exception;
+
+public enum ErrorCode {
+    VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOTE_NOT_FOUND, TAG_NOT_FOUND,
+    EMAIL_ALREADY_EXISTS, AI_TIMEOUT, INTERNAL_SERVER_ERROR
+}
