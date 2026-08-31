@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: studyvault
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:studyvault}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+server:
+  port: ${SERVER_PORT:8080}

@@ -1,0 +1,1 @@
+-- Initial migration placeholder. Add users, notes, tags and note_tags tables in the first backend milestone.
