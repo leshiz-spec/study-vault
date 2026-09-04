@@ -10,6 +10,8 @@ import static org.mockito.Mockito.*;
 import com.example.studyvault.dto.UserResponse;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.GlobalExceptionHandler;
+import com.example.studyvault.exception.UnauthorizedException;
+import com.example.studyvault.exception.UsernameAlreadyExistsException;
 import com.example.studyvault.service.AuthService;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +35,22 @@ class AuthControllerTest {
     @Test void authenticatedMeReturnsSafeUser() throws Exception {
         var controller = new AuthController(auth); mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
         User u = publicUser(); mvc.perform(get("/api/auth/me").principal(new UsernamePasswordAuthenticationToken(u, null))).andExpect(status().isOk()).andExpect(jsonPath("$.data.email").value("a@example.com")).andExpect(content().string(not(containsString("password_hash"))));
+    }
+
+    @Test void loginFailureReturnsStableUnauthorizedError() throws Exception {
+        when(auth.login(any())).thenThrow(new UnauthorizedException());
+        mvc.perform(post("/api/auth/login").contentType("application/json")
+                        .content("{\"usernameOrEmail\":\"alice\",\"password\":\"wrongpass\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test void duplicateUsernameReturnsUsernameAlreadyExists() throws Exception {
+        when(auth.register(any())).thenThrow(new UsernameAlreadyExistsException());
+        mvc.perform(post("/api/auth/register").contentType("application/json")
+                        .content("{\"username\":\"alice\",\"email\":\"new@example.com\",\"password\":\"secret123\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("USERNAME_ALREADY_EXISTS"));
     }
 
     private User publicUser() { User u=new User(); u.setUsername("alice"); u.setEmail("a@example.com"); u.setPasswordHash("never-returned"); return u; }

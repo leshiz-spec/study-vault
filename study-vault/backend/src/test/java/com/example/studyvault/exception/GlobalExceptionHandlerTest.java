@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 class GlobalExceptionHandlerTest {
     private MockMvc mvc;
@@ -45,6 +46,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.success", is(false)))
                 .andExpect(jsonPath("$.error.code", is("VALIDATION_ERROR")))
                 .andExpect(jsonPath("$.error.details.title").exists());
+    }
+
+    @Test
+    void handlesMalformedJsonBody() throws Exception {
+        mvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{bad"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code", is("MALFORMED_REQUEST")))
+                .andExpect(jsonPath("$.error.message", is("Malformed request body")));
     }
 
     @RestController

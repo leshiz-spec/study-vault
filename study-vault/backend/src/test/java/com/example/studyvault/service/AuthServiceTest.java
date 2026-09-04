@@ -9,6 +9,7 @@ import com.example.studyvault.dto.RegisterRequest;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.EmailAlreadyExistsException;
 import com.example.studyvault.exception.UnauthorizedException;
+import com.example.studyvault.exception.UsernameAlreadyExistsException;
 import com.example.studyvault.repository.UserRepository;
 import com.example.studyvault.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,15 @@ class AuthServiceTest {
         when(users.existsByEmail("a@example.com")).thenReturn(true);
         var ex = assertThrows(EmailAlreadyExistsException.class, () -> service.register(new RegisterRequest("alice", "a@example.com", "secret123")));
         assertEquals("EMAIL_ALREADY_EXISTS", ex.getCode().name()); verify(users, never()).save(any());
+    }
+
+    @Test void duplicateUsernameUsesStableErrorEvenWhenEmailAlsoExists() {
+        when(users.existsByUsername("alice")).thenReturn(true);
+        when(users.existsByEmail("a@example.com")).thenReturn(true);
+        var ex = assertThrows(UsernameAlreadyExistsException.class,
+                () -> service.register(new RegisterRequest("alice", "a@example.com", "secret123")));
+        assertEquals("USERNAME_ALREADY_EXISTS", ex.getCode().name());
+        verify(users, never()).save(any());
     }
 
     @Test void successfulLoginChecksPassword() {

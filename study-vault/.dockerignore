@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+**/.DS_Store
+**/node_modules
+**/dist
+**/target
+**/*.log
+**/*.local
+**/coverage
+**/.idea
+**/.vscode

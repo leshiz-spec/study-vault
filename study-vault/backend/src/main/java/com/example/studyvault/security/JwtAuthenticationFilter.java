@@ -19,6 +19,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public static final String COOKIE_NAME = "STUDYVAULT_TOKEN";
     private final JwtService jwtService; private final UserRepository users;
     public JwtAuthenticationFilter(JwtService jwtService, UserRepository users) { this.jwtService = jwtService; this.users = users; }
+    /**
+     * Streaming downloads use Servlet async dispatches. Re-read the HttpOnly
+     * cookie on that dispatch so authorization does not see the request as anonymous.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() { return false; }
+
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         String token = cookie(request);
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {

@@ -6,6 +6,7 @@ import com.example.studyvault.dto.UserResponse;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.EmailAlreadyExistsException;
 import com.example.studyvault.exception.UnauthorizedException;
+import com.example.studyvault.exception.UsernameAlreadyExistsException;
 import com.example.studyvault.repository.UserRepository;
 import com.example.studyvault.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,8 +19,8 @@ public class AuthService {
     public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt) { this.users = users; this.encoder = encoder; this.jwt = jwt; }
     @Transactional
     public AuthResult register(RegisterRequest request) {
+        if (users.existsByUsername(request.username())) throw new UsernameAlreadyExistsException();
         if (users.existsByEmail(request.email())) throw new EmailAlreadyExistsException();
-        if (users.existsByUsername(request.username())) throw new UnauthorizedException();
         User user = new User(); user.setUsername(request.username()); user.setEmail(request.email()); user.setPasswordHash(encoder.encode(request.password()));
         user = users.save(user); return new AuthResult(UserResponse.from(user), jwt.issue(user.getId(), user.getUsername()));
     }

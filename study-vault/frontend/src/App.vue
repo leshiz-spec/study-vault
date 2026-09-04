@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-const notes = ref([{ title: 'Welcome to StudyVault', body: 'Your personal Markdown knowledge base is ready.', tag: 'Getting started' }])
-const title = ref(''); const body = ref(''); const saved = ref(true)
-function addNote(){ if(!title.value.trim()) return; notes.value.unshift({ title: title.value, body: body.value, tag: 'New' }); title.value=''; body.value=''; saved.value=true }
+import { useRouter } from 'vue-router'
+import { useAuthStore } from './stores/auth'
+const auth = useAuthStore(); const router = useRouter()
+async function logout() { await auth.logout(); router.push('/login') }
 </script>
-<template><div class="shell"><aside><div class="brand"><span class="mark">S</span><span><b>StudyVault</b><small>个人知识库</small></span></div><button class="new" @click="title=''">＋ 新建笔记</button><nav><a class="active">⌂ 总览</a><a>▤ 全部笔记 <i>{{ notes.length }}</i></a><a>☆ 我的收藏</a><a>♧ 回收站</a></nav><div class="tags"><small>标签</small><a># Getting started</a><a># 后端</a><a># 数据库</a></div></aside><main><header><span>你的学习空间 / <b>总览</b></span><span>⌕　♢　<span class="avatar">林</span></span></header><section class="content"><div class="hero"><div><small>STUDY / YOUR WORKSPACE</small><h1>早上好，林同学 ✦</h1><p>把今天的思考，变成明天的能力。</p></div><span class="date">2024年9月 · 第 4 周</span></div><div class="stats"><div><small>笔记总数</small><strong>{{ notes.length }}</strong><em>↑ 3 比上周新增</em></div><div><small>已收藏</small><strong>4</strong><em>保持你的灵感</em></div><div><small>标签</small><strong>8</strong><em>覆盖 4 个主题</em></div><div><small>本周专注</small><strong>6.5<small> h</small></strong><em>↑ 18% 学习时长</em></div></div><div class="grid"><div class="panel"><div class="panel-head"><b>最近编辑</b><a>查看全部 →</a></div><article v-for="note in notes.slice(0,4)" :key="note.title"><span class="file">MD</span><div><b>{{ note.title }}</b><p>{{ note.body }}</p></div><small>{{ note.tag }}</small></article></div><div class="panel activity"><div class="panel-head"><b>学习活动</b><small>最近 7 天</small></div><div class="bars"><i v-for="h in [35,55,42,75,52,92,68]" :key="h" :style="{height:h+'%'}"></i></div><footer>本周编辑笔记 <b>8 篇</b></footer></div></div><div class="editor panel"><div><small>QUICK CAPTURE</small><h2>记录一个新想法</h2></div><input v-model="title" placeholder="标题" @input="saved=false"/><textarea v-model="body" placeholder="用 Markdown 写下你的想法..." @input="saved=false"></textarea><div class="editor-foot"><span>{{ saved ? '✓ 已自动保存' : '● 未保存' }}</span><button @click="addNote">保存笔记</button></div></div></section></main></div></template>
+<template>
+  <div class="site-shell">
+    <header class="site-header">
+      <RouterLink class="site-brand" to="/dashboard"><span class="brand-mark">S</span><span><strong>StudyVault</strong><small>Personal knowledge base</small></span></RouterLink>
+      <nav v-if="auth.isAuthenticated" class="site-nav"><RouterLink to="/dashboard">Dashboard</RouterLink><RouterLink to="/notes">Notes</RouterLink><RouterLink to="/trash">Trash</RouterLink><span class="site-user">{{ auth.user?.username }}</span><button class="header-logout" @click="logout" :disabled="auth.loading">{{ auth.loading ? '…' : 'Log out' }}</button></nav>
+    </header>
+    <RouterView />
+    <footer class="site-footer"><span>StudyVault</span><span>Keep learning, one note at a time.</span></footer>
+  </div>
+</template>
