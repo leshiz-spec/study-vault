@@ -6,10 +6,13 @@ import static org.mockito.Mockito.*;
 
 import com.example.studyvault.dto.NoteCreateRequest;
 import com.example.studyvault.dto.NoteUpdateRequest;
+import com.example.studyvault.dto.ReviewStatusRequest;
 import com.example.studyvault.entity.Note;
+import com.example.studyvault.entity.NoteRevision;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.NoteNotFoundException;
 import com.example.studyvault.repository.NoteRepository;
+import com.example.studyvault.repository.NoteRevisionRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.PageImpl;
@@ -20,13 +23,15 @@ import org.junit.jupiter.api.Test;
 
 class NoteServiceTest {
     private NoteRepository repository;
+    private NoteRevisionRepository revisions;
     private NoteService service;
     private User user;
 
     @BeforeEach
     void setUp() {
         repository = mock(NoteRepository.class);
-        service = new NoteService(repository);
+        revisions = mock(NoteRevisionRepository.class);
+        service = new NoteService(repository, null, revisions);
         user = user(1L, "alice");
     }
 
@@ -81,12 +86,58 @@ class NoteServiceTest {
     }
 
     @Test
+    void updateChangedNoteCreatesRevisionFromPreviousState() {
+        Note note = note(10L, user, "Old", "Old body");
+        when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
+        when(repository.save(note)).thenReturn(note);
+        when(revisions.save(any(NoteRevision.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.update(user, 10L, new NoteUpdateRequest("New", "New body"));
+
+        verify(revisions).save(argThat(revision -> revision.getNote() == note
+                && revision.getTitle().equals("Old")
+                && revision.getContent().equals("Old body")));
+    }
+
+    @Test
+    void updateWithoutChangesDoesNotCreateRevision() {
+        Note note = note(10L, user, "Title", "Body");
+        when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
+        when(repository.save(note)).thenReturn(note);
+
+        service.update(user, 10L, new NoteUpdateRequest("Title", "Body"));
+
+        verifyNoInteractions(revisions);
+    }
+
+    @Test
     void deleteOwnNoteSoftDeletes() {
         Note note = note(10L, user, "Title", "Body");
         when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
         service.delete(user, 10L);
         assertEquals("trash", note.getStatus());
         verify(repository).save(note);
+    }
+
+    @Test
+    void permanentlyDeleteOwnTrashedNote() {
+        Note note = note(10L, user, "Title", "Body");
+        note.setStatus("trash");
+        when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
+
+        service.permanentlyDelete(user, 10L);
+
+        verify(repository).delete(note);
+        verify(repository, never()).save(any(Note.class));
+    }
+
+    @Test
+    void permanentlyDeleteDoesNotRemoveActiveNote() {
+        Note note = note(10L, user, "Title", "Body");
+        when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
+
+        assertThrows(NoteNotFoundException.class, () -> service.permanentlyDelete(user, 10L));
+        verify(repository, never()).delete(any(Note.class));
     }
 
     @Test
@@ -110,6 +161,25 @@ class NoteServiceTest {
         assertEquals("active", note.getStatus());
         assertEquals("active", result.status());
         verify(repository).save(note);
+    }
+
+    @Test
+    void updateReviewStatusScopesNoteToOwner() {
+        Note note = note(10L, user, "Title", "Body");
+        when(repository.findByIdAndUser(10L, user)).thenReturn(Optional.of(note));
+        when(repository.save(note)).thenReturn(note);
+
+        var result = service.updateReviewStatus(user, 10L, new ReviewStatusRequest("mastered"));
+
+        assertEquals("mastered", result.reviewStatus());
+        verify(repository).findByIdAndUser(10L, user);
+    }
+
+    @Test
+    void invalidReviewStatusIsRejected() {
+        assertThrows(com.example.studyvault.exception.InvalidReviewStatusException.class,
+                () -> service.updateReviewStatus(user, 10L, new ReviewStatusRequest("reviewed")));
+        verifyNoInteractions(repository);
     }
 
     @Test

@@ -7,20 +7,27 @@ import {
   addTagToNote,
   createNote,
   getNote,
+  listNoteRevisions,
   listTags,
   removeTagFromNote,
+  restoreNoteRevision,
   saveNoteSummary,
   summarizeNote,
   updateNote,
+  updateNoteReviewStatus,
+  type ReviewStatus,
+  type NoteRevision,
   type Tag,
 } from "../api";
 import { useAuthStore } from "../stores/auth";
+import { hasShortcutModifier, shortcutModifier } from "../keyboard";
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const id = route.params.id ? Number(route.params.id) : null;
 const title = ref("");
 const content = ref("");
+const reviewStatus = ref<ReviewStatus>("not_started");
 const noteTags = ref<Tag[]>([]);
 const persistedTagIds = ref<number[]>([]);
 const availableTags = ref<Tag[]>([]);
@@ -35,8 +42,18 @@ const summaryLoading = ref(false);
 const summarySaving = ref(false);
 const summaryError = ref("");
 const summarySaved = ref(false);
+const revisions = ref<NoteRevision[]>([]);
+const revisionLoading = ref(false);
+const revisionError = ref("");
+const selectedRevision = ref<NoteRevision | null>(null);
+const restoringRevision = ref(false);
 const renderedMarkdown = computed(() =>
   DOMPurify.sanitize(marked.parse(content.value, { async: false }) as string),
+);
+const renderedRevisionMarkdown = computed(() =>
+  selectedRevision.value
+    ? DOMPurify.sanitize(marked.parse(selectedRevision.value.content, { async: false }) as string)
+    : "",
 );
 const palette: Record<string, string> = {
   Red: "#ef4444",
@@ -61,6 +78,7 @@ function tagColor(tag?: Tag) {
 }
 let persistedTitle = "";
 let persistedContent = "";
+let persistedReviewStatus: ReviewStatus = "not_started";
 let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 const draftKey = (noteId: number | null = id) =>
   `studyvault:note-draft:${auth.user?.id ?? auth.user?.username ?? "anonymous"}:${noteId ?? "new"}`;
@@ -229,6 +247,7 @@ async function load() {
       const note = await getNote(id);
       title.value = note.title;
       content.value = note.content;
+      reviewStatus.value = (note.reviewStatus || "not_started") as ReviewStatus;
       summaryDraft.value = note.summary || "";
       noteTags.value = note.tags || [];
       persistedTagIds.value = noteTags.value.map((tag) => tag.id);
@@ -244,6 +263,8 @@ async function load() {
       }
       persistedTitle = note.title;
       persistedContent = note.content;
+      persistedReviewStatus = reviewStatus.value;
+      await loadRevisions();
     } else {
       const draft = localStorage.getItem(draftKey(null));
       if (draft) {
@@ -264,6 +285,48 @@ async function load() {
     loading.value = false;
   }
 }
+async function loadRevisions() {
+  if (!id) return;
+  revisionLoading.value = true;
+  revisionError.value = "";
+  try {
+    revisions.value = await listNoteRevisions(id);
+    if (selectedRevision.value) {
+      selectedRevision.value = revisions.value.find((revision) => revision.id === selectedRevision.value?.id) || null;
+    }
+  } catch (e) {
+    revisionError.value = e instanceof Error ? e.message : "Unable to load version history";
+  } finally {
+    revisionLoading.value = false;
+  }
+}
+function selectRevision(revision: NoteRevision) {
+  selectedRevision.value = revision;
+}
+async function restoreRevision() {
+  if (!id || !selectedRevision.value) return;
+  if (!window.confirm(`Restore version from ${formatRevisionDate(selectedRevision.value.createdAt)}?`)) return;
+  restoringRevision.value = true;
+  revisionError.value = "";
+  try {
+    const restored = await restoreNoteRevision(id, selectedRevision.value.id);
+    title.value = restored.title;
+    content.value = restored.content;
+    persistedTitle = restored.title;
+    persistedContent = restored.content;
+    localStorage.removeItem(draftKey(id));
+    autosaveState.value = "saved";
+    await loadRevisions();
+    selectedRevision.value = null;
+  } catch (e) {
+    revisionError.value = e instanceof Error ? e.message : "Unable to restore version";
+  } finally {
+    restoringRevision.value = false;
+  }
+}
+function formatRevisionDate(value?: string) {
+  return value ? new Date(value).toLocaleString() : "Unknown time";
+}
 async function generateSummary() {
   if (!id) return;
   summaryLoading.value = true;
@@ -272,23 +335,14 @@ async function generateSummary() {
   try {
     const result = await summarizeNote(id);
     summaryDraft.value = result.summary;
-  } catch (e) {
-    summaryError.value = e instanceof Error ? e.message : "Unable to generate summary";
-  } finally {
-    summaryLoading.value = false;
-  }
-}
-async function saveSummary() {
-  if (!id || !summaryDraft.value.trim()) return;
-  summarySaving.value = true;
-  summaryError.value = "";
-  try {
-    const saved = await saveNoteSummary(id, summaryDraft.value);
-    summaryDraft.value = saved.summary || summaryDraft.value;
+    summarySaving.value = true;
+    const saved = await saveNoteSummary(id, result.summary);
+    summaryDraft.value = saved.summary || result.summary;
     summarySaved.value = true;
   } catch (e) {
-    summaryError.value = e instanceof Error ? e.message : "Unable to save summary";
+    summaryError.value = e instanceof Error ? e.message : "Unable to generate and save summary";
   } finally {
+    summaryLoading.value = false;
     summarySaving.value = false;
   }
 }
@@ -350,8 +404,13 @@ async function save() {
     if (id) {
       await updateNote(id, { title: title.value, content: content.value });
       await saveTags(id);
+      if (reviewStatus.value !== persistedReviewStatus) {
+        await updateNoteReviewStatus(id, reviewStatus.value);
+        persistedReviewStatus = reviewStatus.value;
+      }
     } else {
-      await createNote({ title: title.value, content: content.value });
+      const created = await createNote({ title: title.value, content: content.value });
+      if (reviewStatus.value !== "not_started") await updateNoteReviewStatus(created.id, reviewStatus.value);
     }
     manuallySaved.value = true;
     localStorage.removeItem(draftKey());
@@ -363,8 +422,26 @@ async function save() {
     saving.value = false;
   }
 }
+function handleEditorShortcut(event: KeyboardEvent) {
+  if (hasShortcutModifier(event) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    if (!id || saving.value) return;
+    void save();
+    return;
+  }
+  if (event.key !== "Escape") return;
+  if (cropImageId.value) {
+    cropImageId.value = null;
+  } else if (selectedRevision.value) {
+    selectedRevision.value = null;
+  } else if (mode.value === "preview") {
+    mode.value = "edit";
+  }
+}
 onMounted(load);
+onMounted(() => window.addEventListener("keydown", handleEditorShortcut));
 onUnmounted(() => {
+  window.removeEventListener("keydown", handleEditorShortcut);
   if (autosaveTimer) clearTimeout(autosaveTimer);
   if (
     !manuallySaved.value &&
@@ -395,6 +472,10 @@ watch([title, content], scheduleAutosave);
               : "Turn a thought into something you can return to."
           }}
         </p>
+        <div class="shortcut-hints" aria-label="Keyboard shortcuts">
+          <span v-if="id"><kbd>{{ shortcutModifier }} S</kbd> Save note</span>
+          <span><kbd>Esc</kbd> Close preview</span>
+        </div>
       </div>
     </header>
     <p v-if="loading" class="state">Loading note…</p>
@@ -407,6 +488,14 @@ watch([title, content], scheduleAutosave);
           maxlength="255"
           placeholder="Note title"
       /></label>
+      <label class="review-status-field"
+        >Review status<select v-model="reviewStatus" aria-label="Review status">
+          <option value="not_started">Not started</option>
+          <option value="learning">Learning</option>
+          <option value="review">Review</option>
+          <option value="mastered">Mastered</option>
+        </select></label
+      >
       <div v-if="id" class="assigned-tags">
         <span
           v-for="tag in noteTags"
@@ -576,9 +665,44 @@ watch([title, content], scheduleAutosave);
         v-html="renderedMarkdown"
         aria-label="Markdown preview"
       ></div>
+      <section v-if="id" class="revision-panel" aria-label="Note version history">
+        <div class="revision-header">
+          <div>
+            <strong>Version History</strong>
+            <small>Current content stays in the editor above.</small>
+          </div>
+        </div>
+        <p v-if="revisionError" class="error">{{ revisionError }}</p>
+        <p v-if="revisionLoading" class="autosave-indicator autosave-saving">Loading history...</p>
+        <p v-else-if="!revisions.length" class="revision-empty">No earlier versions yet. Edit and save this note to create one.</p>
+        <div v-else class="revision-layout">
+          <div class="revision-list">
+            <button
+              v-for="revision in revisions"
+              :key="revision.id"
+              type="button"
+              class="revision-item"
+              :class="{ selected: selectedRevision?.id === revision.id }"
+              @click="selectRevision(revision)"
+            >
+              <strong>{{ formatRevisionDate(revision.createdAt) }}</strong>
+              <span>{{ revision.title }}</span>
+            </button>
+          </div>
+          <div v-if="selectedRevision" class="revision-preview">
+            <span class="revision-label">Historical version</span>
+            <h3>{{ selectedRevision.title }}</h3>
+            <div class="markdown-preview" v-html="renderedRevisionMarkdown"></div>
+            <button type="button" class="button" :disabled="restoringRevision" @click="restoreRevision">
+              {{ restoringRevision ? "Restoring..." : "Restore this version" }}
+            </button>
+          </div>
+          <p v-else class="revision-empty">Select a version to preview it.</p>
+        </div>
+      </section>
       <section v-if="id" class="summary-panel" aria-label="AI note summary">
         <div class="summary-header">
-          <strong>AI summary draft</strong>
+          <strong>AI summary</strong>
           <button
             type="button"
             class="button secondary"
@@ -595,27 +719,20 @@ watch([title, content], scheduleAutosave);
         <textarea
           v-if="summaryDraft"
           v-model="summaryDraft"
+          readonly
           class="summary-draft"
-          aria-label="Generated summary draft"
-          placeholder="Generated summary draft"
-          @input="summarySaved = false"
+          aria-label="Generated summary"
         ></textarea>
         <div v-if="summaryDraft" class="summary-actions">
           <span v-if="summarySaved" class="autosave-indicator autosave-saved">Summary saved.</span>
-          <button
-            type="button"
-            class="button"
-            :disabled="summarySaving || summaryLoading || !summaryDraft.trim()"
-            @click="saveSummary"
-          >
-            {{ summarySaving ? "Saving..." : "Save summary" }}
-          </button>
+          <span v-else-if="summarySaving" class="autosave-indicator autosave-saving">Saving summary...</span>
         </div>
       </section>
       <div class="editor-actions">
         <RouterLink class="button secondary" to="/notes">Cancel</RouterLink
         ><button class="button save-button" :disabled="saving">
-          {{ saving ? "Saving…" : "Save note" }}
+          <span>{{ saving ? "Saving…" : "Save note" }}</span>
+          <kbd v-if="id">{{ shortcutModifier }} S</kbd>
         </button>
       </div>
     </form>

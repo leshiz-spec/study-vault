@@ -7,12 +7,15 @@ import com.example.studyvault.dto.NoteUpdateRequest;
 import com.example.studyvault.dto.NoteTagRequest;
 import com.example.studyvault.dto.NoteSummaryResponse;
 import com.example.studyvault.dto.NoteSummarySaveRequest;
+import com.example.studyvault.dto.NoteRevisionResponse;
+import com.example.studyvault.dto.ReviewStatusRequest;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.UnauthorizedException;
 import com.example.studyvault.service.NoteService;
 import com.example.studyvault.service.NoteTagService;
 import com.example.studyvault.service.NoteFileService;
 import com.example.studyvault.service.NoteSummaryService;
+import com.example.studyvault.service.NoteRevisionService;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -29,13 +32,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 @RestController
 @RequestMapping("/api/notes")
 public class NoteController {
-    private final NoteService notes; private final NoteTagService noteTags; private final NoteFileService files; private final NoteSummaryService summaries;
+    private final NoteService notes; private final NoteTagService noteTags; private final NoteFileService files; private final NoteSummaryService summaries; private final NoteRevisionService revisions;
 
     @Autowired
-    public NoteController(NoteService notes, NoteTagService noteTags, NoteFileService files, NoteSummaryService summaries) { this.notes = notes; this.noteTags = noteTags; this.files = files; this.summaries = summaries; }
-    public NoteController(NoteService notes, NoteTagService noteTags, NoteFileService files) { this(notes, noteTags, files, null); }
-    public NoteController(NoteService notes, NoteTagService noteTags) { this(notes, noteTags, null, null); }
-    public NoteController(NoteService notes) { this(notes, null, null, null); }
+    public NoteController(NoteService notes, NoteTagService noteTags, NoteFileService files, NoteSummaryService summaries, NoteRevisionService revisions) { this.notes = notes; this.noteTags = noteTags; this.files = files; this.summaries = summaries; this.revisions = revisions; }
+    public NoteController(NoteService notes, NoteTagService noteTags, NoteFileService files, NoteSummaryService summaries) { this(notes, noteTags, files, summaries, null); }
+    public NoteController(NoteService notes, NoteTagService noteTags, NoteFileService files) { this(notes, noteTags, files, null, null); }
+    public NoteController(NoteService notes, NoteTagService noteTags) { this(notes, noteTags, null, null, null); }
+    public NoteController(NoteService notes) { this(notes, null, null, null, null); }
 
     @GetMapping
     public ApiResponse<List<NoteResponse>> list(Authentication authentication) {
@@ -86,12 +90,33 @@ public class NoteController {
         return ApiResponse.success(notes.update(currentUser(authentication), id, request));
     }
 
+    @PutMapping("/{id}/review-status")
+    public ApiResponse<NoteResponse> updateReviewStatus(Authentication authentication, @PathVariable Long id,
+                                                         @Valid @RequestBody ReviewStatusRequest request) {
+        return ApiResponse.success(notes.updateReviewStatus(currentUser(authentication), id, request));
+    }
+
+    @GetMapping("/{id}/revisions")
+    public ApiResponse<List<NoteRevisionResponse>> revisions(Authentication authentication, @PathVariable Long id) {
+        return ApiResponse.success(revisions.list(currentUser(authentication), id));
+    }
+
+    @GetMapping("/{id}/revisions/{revisionId}")
+    public ApiResponse<NoteRevisionResponse> revision(Authentication authentication, @PathVariable Long id, @PathVariable Long revisionId) {
+        return ApiResponse.success(revisions.get(currentUser(authentication), id, revisionId));
+    }
+
+    @PostMapping("/{id}/revisions/{revisionId}/restore")
+    public ApiResponse<NoteResponse> restoreRevision(Authentication authentication, @PathVariable Long id, @PathVariable Long revisionId) {
+        return ApiResponse.success(revisions.restore(currentUser(authentication), id, revisionId));
+    }
+
     @PostMapping("/{id}/summarize")
     public ApiResponse<NoteSummaryResponse> summarize(Authentication authentication, @PathVariable Long id) {
         return ApiResponse.success(summaries.summarize(currentUser(authentication), id));
     }
 
-    /** Persists a generated draft only after the user explicitly confirms it. */
+    /** Persists a generated summary. The editor calls this immediately after generation. */
     @PutMapping("/{id}/summary")
     public ApiResponse<NoteResponse> saveSummary(Authentication authentication, @PathVariable Long id,
                                                   @Valid @RequestBody NoteSummarySaveRequest request) {
@@ -111,6 +136,12 @@ public class NoteController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(Authentication authentication, @PathVariable Long id) {
         notes.delete(currentUser(authentication), id);
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    public ApiResponse<Void> permanentlyDelete(Authentication authentication, @PathVariable Long id) {
+        notes.permanentlyDelete(currentUser(authentication), id);
         return ApiResponse.success(null);
     }
 

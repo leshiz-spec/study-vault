@@ -9,7 +9,7 @@ import com.example.studyvault.repository.NoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Coordinates ownership checks, draft generation, and explicit summary persistence. */
+/** Coordinates ownership checks, summary generation, and summary persistence. */
 @Service
 public class NoteSummaryService {
     private final NoteRepository notes;

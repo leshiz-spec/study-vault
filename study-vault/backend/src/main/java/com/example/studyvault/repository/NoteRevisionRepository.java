@@ -6,5 +6,6 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NoteRevisionRepository extends JpaRepository<NoteRevision, Long> {
-    List<NoteRevision> findAllByNoteOrderByCreatedAtDesc(Note note);
+    List<NoteRevision> findAllByNote_IdAndNote_User_IdOrderByCreatedAtDesc(Long noteId, Long userId);
+    java.util.Optional<NoteRevision> findByIdAndNote_IdAndNote_User_Id(Long revisionId, Long noteId, Long userId);
 }

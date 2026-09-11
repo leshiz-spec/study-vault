@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.studyvault.dto.NoteCreateRequest;
 import com.example.studyvault.dto.NoteResponse;
+import com.example.studyvault.dto.NoteRevisionResponse;
 import com.example.studyvault.dto.NoteSummaryResponse;
 import com.example.studyvault.dto.NoteUpdateRequest;
 import com.example.studyvault.entity.User;
@@ -17,6 +18,7 @@ import com.example.studyvault.exception.NoteNotFoundException;
 import com.example.studyvault.service.NoteService;
 import com.example.studyvault.service.NoteTagService;
 import com.example.studyvault.service.NoteSummaryService;
+import com.example.studyvault.service.NoteRevisionService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,12 +31,13 @@ class NoteControllerTest {
     private NoteService service;
     private NoteTagService noteTags;
     private NoteSummaryService summaries;
+    private NoteRevisionService revisions;
     private User alice;
 
     @BeforeEach
     void setUp() {
-        service = mock(NoteService.class); noteTags = mock(NoteTagService.class); summaries = mock(NoteSummaryService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new NoteController(service, noteTags, null, summaries))
+        service = mock(NoteService.class); noteTags = mock(NoteTagService.class); summaries = mock(NoteSummaryService.class); revisions = mock(NoteRevisionService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new NoteController(service, noteTags, null, summaries, revisions))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         alice = new User();
         alice.setUsername("alice");
@@ -76,9 +79,44 @@ class NoteControllerTest {
     }
 
     @Test
+    void updateReviewStatus() throws Exception {
+        when(service.updateReviewStatus(eq(alice), eq(1L), any(com.example.studyvault.dto.ReviewStatusRequest.class)))
+                .thenReturn(new NoteResponse(1L, "Title", "Body", null, "active", false, "mastered", null, null));
+        mvc.perform(put("/api/notes/1/review-status").principal(auth(alice)).contentType("application/json")
+                        .content("{\"reviewStatus\":\"mastered\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.reviewStatus").value("mastered"));
+    }
+
+    @Test
+    void listNoteRevisions() throws Exception {
+        when(revisions.list(alice, 1L)).thenReturn(List.of(new NoteRevisionResponse(2L, 1L, "Old", "Old body", null)));
+        mvc.perform(get("/api/notes/1/revisions").principal(auth(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].title").value("Old"));
+        verify(revisions).list(alice, 1L);
+    }
+
+    @Test
+    void restoreNoteRevision() throws Exception {
+        when(revisions.restore(alice, 1L, 2L)).thenReturn(response(1L, "Old", "Old body", "active"));
+        mvc.perform(post("/api/notes/1/revisions/2/restore").principal(auth(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("Old"));
+        verify(revisions).restore(alice, 1L, 2L);
+    }
+
+    @Test
     void deleteOwnNote() throws Exception {
         mvc.perform(delete("/api/notes/1").principal(auth(alice))).andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true));
         verify(service).delete(alice, 1L);
+    }
+
+    @Test
+    void permanentlyDeleteTrashedNote() throws Exception {
+        mvc.perform(delete("/api/notes/1/permanent").principal(auth(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+        verify(service).permanentlyDelete(alice, 1L);
     }
 
     @Test

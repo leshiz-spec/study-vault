@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   addTagToNote,
@@ -14,6 +14,7 @@ import {
   type Note,
   type Tag,
 } from "../api";
+import { shortcutModifier } from "../keyboard";
 const router = useRouter();
 const notes = ref<Note[]>([]);
 const tags = ref<Tag[]>([]);
@@ -28,6 +29,7 @@ const size = ref(10);
 const totalElements = ref(0);
 const totalPages = ref(0);
 const importInput = ref<HTMLInputElement | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
 const transferState = ref("");
 const transferError = ref("");
 const expandedSections = ref<Set<string>>(new Set());
@@ -239,12 +241,18 @@ function goToPage(next: number) {
   page.value = next;
   load();
 }
+function focusSearch() {
+  searchInput.value?.focus();
+  searchInput.value?.select();
+}
 watch([search, selectedTag, favoriteOnly, sort, size], () =>
   load(true),
 );
 onMounted(async () => {
+  window.addEventListener("studyvault:focus-search", focusSearch);
   await Promise.all([loadTags(), load()]);
 });
+onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSearch));
 </script>
 <template>
   <main class="notes-page">
@@ -253,6 +261,10 @@ onMounted(async () => {
         <span class="eyebrow">YOUR WORKSPACE</span>
         <h1>Notes</h1>
         <p>Capture ideas, lessons, and everything worth remembering.</p>
+        <div class="shortcut-hints" aria-label="Keyboard shortcuts">
+          <span><kbd>{{ shortcutModifier }} K</kbd> Search</span>
+          <span><kbd>{{ shortcutModifier }} N</kbd> New note</span>
+        </div>
       </div>
       <div class="notes-actions">
         <input ref="importInput" class="visually-hidden" type="file" accept=".md,text/markdown,text/plain" @change="handleImport" />
@@ -268,6 +280,7 @@ onMounted(async () => {
       <label class="search-field"
         ><span>Search notes</span
         ><input
+          ref="searchInput"
           v-model="search"
           type="search"
           placeholder="Search title or content…" /></label

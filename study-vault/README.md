@@ -13,8 +13,10 @@ The application is a modular monolith: a Vue single-page application calls a Spr
 - User-owned tags with color choices and note assignment/removal
 - Database-backed search, filtering, pagination, and sorting
 - Favorites and soft deletion (`active` -> `trash` -> `active`)
+- Note version history with ownership-scoped preview and restore
 - Markdown import, single-note export, and ZIP export of the current user's notes
-- Optional AI summary drafts with explicit save confirmation
+- Optional AI summaries that are saved automatically after generation
+- Light and dark themes with local preference and operating-system fallback
 - `/api/health` liveness and `/api/ready` dependency readiness endpoints
 
 The dashboard currently provides a welcome view and navigation links. There is no statistics endpoint in the current implementation.
@@ -207,7 +209,7 @@ npm install
 npm run dev
 ```
 
-The development server is available at [http://localhost:5173](http://localhost:5173). `frontend/vite.config.ts` proxies `/api` to `http://localhost`, which is the Nginx port in the recommended Compose setup. Therefore, either start Compose with its default `APP_PORT=80`, or change the proxy target locally if Nginx is bound to another host port. A production-like static preview can be built and served with:
+The development server is available at [http://localhost:5173](http://localhost:5173). `frontend/vite.config.ts` proxies `/api` to `http://localhost:8080` by default, matching the common local Compose setting `APP_PORT=8080`. If Nginx is bound to another host port, set the proxy target before starting Vite, for example `VITE_API_PROXY_TARGET=http://localhost npm run dev` when using port 80. A production-like static preview can be built and served with:
 
 ```bash
 npm run build
@@ -241,8 +243,9 @@ Flyway migration files live in `backend/src/main/resources/db/migration` and run
 
 - `V1__init.sql` creates users, notes, tags, note relationships, indexes, and constraints.
 - `V2__add_note_revisions.sql` creates note revision history and its index.
+- `V3__add_note_revision_titles.sql` stores the title alongside each historical content snapshot.
 
-Never edit a migration that has already run in a shared database. Add a new sequential file such as `V3__describe_change.sql`, restart the backend, and let Flyway apply it. To inspect applied migrations:
+Never edit a migration that has already run in a shared database. Add a new sequential file such as `V4__describe_change.sql`, restart the backend, and let Flyway apply it. To inspect applied migrations:
 
 ```bash
 export PGPASSWORD="$DATABASE_PASSWORD"
@@ -287,6 +290,9 @@ DELETE /api/notes/{id}                    soft-delete: status becomes trash
 POST   /api/notes/{id}/favorite           toggles favorite
 POST   /api/notes/{id}/restore            changes trash back to active
 GET    /api/notes/trash                   trashed notes owned by the user
+GET    /api/notes/{id}/revisions          historical versions, newest first
+GET    /api/notes/{id}/revisions/{revisionId}
+POST   /api/notes/{id}/revisions/{revisionId}/restore
 GET    /api/search                        q, tag, favorite, status, page, size, sort
 ```
 
@@ -318,11 +324,13 @@ Single-note and ZIP exports are streamed with sanitized filenames. Imports deriv
 ### AI summaries
 
 ```text
-POST /api/notes/{id}/summarize            returns an unsaved summary draft
-PUT  /api/notes/{id}/summary              JSON: { summary }, explicitly saves it
+POST /api/notes/{id}/summarize            generates a summary result
+PUT  /api/notes/{id}/summary              JSON: { summary }, persists a summary
 ```
 
 The note is ownership-checked before its content is sent to the configured provider. Provider failures map to stable codes such as `AI_TIMEOUT`, `AI_RATE_LIMITED`, `AI_PROVIDER_ERROR`, and `AI_NOT_CONFIGURED`.
+
+When a note title or content changes through `PUT /api/notes/{id}`, the previous title and Markdown content are stored as a revision in the same transaction. Identical updates do not create a duplicate revision. Restoring a revision updates the current note through the normal update path, which first snapshots the current state, so restoration never deletes history.
 
 ## Security Design
 
@@ -358,7 +366,7 @@ Restart the backend after changing environment variables:
 docker compose --env-file .env -f deploy/docker-compose.yml up -d --build backend
 ```
 
-The key is read by the backend adapter and is never sent to Vue. Network timeouts, HTTP 429 responses, invalid provider responses, and rejected credentials are returned as clear application errors; the original note is never overwritten by generating a draft.
+The key is read by the backend adapter and is never sent to Vue. Network timeouts, HTTP 429 responses, invalid provider responses, and rejected credentials are returned as clear application errors. The editor automatically persists a generated summary through the summary endpoint; it never changes the original note title or content.
 
 ## Backups
 
@@ -432,7 +440,7 @@ Both Dockerfiles are multi-stage builds. A Maven or Node builder stage downloads
 
 **The AI provider returns an error.** Verify `AI_API_URL` is an OpenAI-compatible chat-completions URL, the model name is valid for that provider, and the key has access. A 429 becomes `AI_RATE_LIMITED`; timeouts become `AI_TIMEOUT`.
 
-**The frontend shows “Failed to fetch”.** Confirm Nginx is running and that the browser URL uses its host port (`APP_PORT`). In standalone Vite development, the configured proxy targets `http://localhost` (port 80); start Compose on port 80 or adjust `frontend/vite.config.ts` for another port.
+**The frontend shows “Failed to fetch”.** Confirm Nginx is running and that the browser URL uses its host port (`APP_PORT`). In standalone Vite development, the proxy defaults to `http://localhost:8080`; set `VITE_API_PROXY_TARGET` if Compose uses another host port, such as `VITE_API_PROXY_TARGET=http://localhost npm run dev` for port 80.
 
 **Login or registration fails.** Check that the backend is running, PostgreSQL is ready, and the browser is using the same origin as Nginx. For local HTTP, keep `AUTH_COOKIE_SECURE=false`; a secure cookie will not be sent over plain HTTP. Duplicate usernames/emails return `USERNAME_ALREADY_EXISTS` or `EMAIL_ALREADY_EXISTS`.
 

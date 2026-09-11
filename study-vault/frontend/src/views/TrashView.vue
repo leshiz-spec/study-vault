@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { listTrash, restoreNote, type Note } from "../api";
+import { listTrash, permanentlyDeleteNote, restoreNote, type Note } from "../api";
 
 const notes = ref<Note[]>([]);
 const loading = ref(true);
@@ -59,6 +59,15 @@ async function restore(note: Note) {
     error.value = e instanceof Error ? e.message : "Unable to restore note";
   }
 }
+async function permanentlyDelete(note: Note) {
+  if (!window.confirm(`Permanently delete “${note.title}”? This cannot be undone.`)) return;
+  try {
+    await permanentlyDeleteNote(note.id);
+    notes.value = notes.value.filter((item) => item.id !== note.id);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Unable to permanently delete note";
+  }
+}
 onMounted(load);
 </script>
 
@@ -114,6 +123,7 @@ onMounted(load);
         </div>
         <div class="note-card-actions">
           <button class="restore-link" @click="restore(note)">Restore</button>
+          <button class="danger-link" @click="permanentlyDelete(note)">Delete permanently</button>
         </div>
       </article>
     </section>

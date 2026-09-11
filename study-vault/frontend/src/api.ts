@@ -3,6 +3,10 @@ export type Note = { id: number; title: string; content: string; summary?: strin
 export type NoteInput = { title: string; content: string }
 export type NoteSearchResult = { content: Note[]; page: number; size: number; totalElements: number; totalPages: number }
 export type Tag = { id: number; name: string; color?: string | null; createdAt?: string }
+export type NoteRevision = { id: number; noteId: number; title: string; content: string; createdAt?: string }
+export type ReviewStatus = 'not_started' | 'learning' | 'review' | 'mastered'
+export type StudyTaskStatus = 'todo' | 'in_progress' | 'done'
+export type StudyTask = { id: number; title: string; dueDate?: string | null; status: StudyTaskStatus; noteId?: number | null; noteTitle?: string | null; noteIds: number[]; noteTitles: string[]; createdAt?: string; updatedAt?: string }
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
@@ -30,9 +34,14 @@ export const searchNotes = (params: { q?: string; tag?: string; favorite?: boole
 export const getNote = (id: number) => apiRequest<Note>(`/notes/${id}`)
 export const createNote = (input: NoteInput) => apiRequest<Note>('/notes', { method: 'POST', body: JSON.stringify(input) })
 export const updateNote = (id: number, input: NoteInput) => apiRequest<Note>(`/notes/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+export const updateNoteReviewStatus = (id: number, reviewStatus: ReviewStatus) => apiRequest<Note>(`/notes/${id}/review-status`, { method: 'PUT', body: JSON.stringify({ reviewStatus }) })
+export const listNoteRevisions = (id: number) => apiRequest<NoteRevision[]>(`/notes/${id}/revisions`)
+export const getNoteRevision = (id: number, revisionId: number) => apiRequest<NoteRevision>(`/notes/${id}/revisions/${revisionId}`)
+export const restoreNoteRevision = (id: number, revisionId: number) => apiRequest<Note>(`/notes/${id}/revisions/${revisionId}/restore`, { method: 'POST' })
 export const summarizeNote = (id: number) => apiRequest<{ noteId: number; summary: string }>(`/notes/${id}/summarize`, { method: 'POST' })
 export const saveNoteSummary = (id: number, summary: string) => apiRequest<Note>(`/notes/${id}/summary`, { method: 'PUT', body: JSON.stringify({ summary }) })
 export const deleteNote = (id: number) => apiRequest<null>(`/notes/${id}`, { method: 'DELETE' })
+export const permanentlyDeleteNote = (id: number) => apiRequest<null>(`/notes/${id}/permanent`, { method: 'DELETE' })
 export const listTrash = () => apiRequest<Note[]>('/notes/trash')
 export const toggleFavorite = (id: number) => apiRequest<Note>(`/notes/${id}/favorite`, { method: 'POST' })
 export const restoreNote = (id: number) => apiRequest<Note>(`/notes/${id}/restore`, { method: 'POST' })
@@ -42,6 +51,20 @@ export const updateTag = (id: number, input: { name: string; color?: string }) =
 export const deleteTag = (id: number) => apiRequest<null>(`/tags/${id}`, { method: 'DELETE' })
 export const addTagToNote = (noteId: number, tagId: number) => apiRequest<Note>(`/notes/${noteId}/tags`, { method: 'POST', body: JSON.stringify({ tagId }) })
 export const removeTagFromNote = (noteId: number, tagId: number) => apiRequest<null>(`/notes/${noteId}/tags/${tagId}`, { method: 'DELETE' })
+export type StudyTaskFilters = { status?: StudyTaskStatus; dueDate?: string; dueAfter?: string; dueBefore?: string }
+export const listTasks = (filters: StudyTaskFilters = {}) => {
+  const query = new URLSearchParams()
+  if (filters.status) query.set('status', filters.status)
+  if (filters.dueDate) query.set('dueDate', filters.dueDate)
+  if (filters.dueAfter) query.set('dueAfter', filters.dueAfter)
+  if (filters.dueBefore) query.set('dueBefore', filters.dueBefore)
+  const suffix = query.toString()
+  return apiRequest<StudyTask[]>(`/tasks${suffix ? `?${suffix}` : ''}`)
+}
+export type StudyTaskInput = { title: string; dueDate?: string | null; status?: StudyTaskStatus; noteIds?: number[] }
+export const createTask = (input: StudyTaskInput) => apiRequest<StudyTask>('/tasks', { method: 'POST', body: JSON.stringify(input) })
+export const updateTask = (id: number, input: StudyTaskInput) => apiRequest<StudyTask>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+export const deleteTask = (id: number) => apiRequest<null>(`/tasks/${id}`, { method: 'DELETE' })
 
 export async function downloadFile(path: string, fallbackName: string): Promise<{ blob: Blob; filename: string }> {
   const response = await fetch(`/api${path}`, { credentials: 'include', cache: 'no-store' })

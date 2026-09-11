@@ -3,12 +3,17 @@ package com.example.studyvault.service;
 import com.example.studyvault.dto.NoteCreateRequest;
 import com.example.studyvault.dto.NoteResponse;
 import com.example.studyvault.dto.NoteUpdateRequest;
+import com.example.studyvault.dto.ReviewStatusRequest;
 import com.example.studyvault.entity.Note;
+import com.example.studyvault.entity.NoteRevision;
 import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.NoteNotFoundException;
 import com.example.studyvault.repository.NoteRepository;
+import com.example.studyvault.repository.NoteRevisionRepository;
 import com.example.studyvault.repository.NoteTagRepository;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.example.studyvault.dto.NoteSearchResponse;
@@ -19,11 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NoteService {
-    private final NoteRepository notes; private final NoteTagRepository noteTags;
+    private static final Set<String> REVIEW_STATUSES = Set.of("not_started", "learning", "review", "mastered");
+    private final NoteRepository notes; private final NoteTagRepository noteTags; private final NoteRevisionRepository revisions;
 
     @Autowired
-    public NoteService(NoteRepository notes, NoteTagRepository noteTags) { this.notes = notes; this.noteTags = noteTags; }
-    public NoteService(NoteRepository notes) { this(notes, null); }
+    public NoteService(NoteRepository notes, NoteTagRepository noteTags, NoteRevisionRepository revisions) { this.notes = notes; this.noteTags = noteTags; this.revisions = revisions; }
+    public NoteService(NoteRepository notes, NoteTagRepository noteTags) { this(notes, noteTags, null); }
+    public NoteService(NoteRepository notes) { this(notes, null, null); }
 
     @Transactional
     public NoteResponse create(User user, NoteCreateRequest request) {
@@ -57,8 +64,27 @@ public class NoteService {
     @Transactional
     public NoteResponse update(User user, Long id, NoteUpdateRequest request) {
         Note note = findOwned(user, id);
+        boolean changed = !Objects.equals(note.getTitle(), request.title())
+                || !Objects.equals(note.getContent(), request.content());
+        if (changed && revisions != null) {
+            NoteRevision revision = new NoteRevision();
+            revision.setNote(note);
+            revision.setTitle(note.getTitle());
+            revision.setContent(note.getContent());
+            revisions.save(revision);
+        }
         note.setTitle(request.title());
         note.setContent(request.content());
+        return response(notes.save(note));
+    }
+
+    @Transactional
+    public NoteResponse updateReviewStatus(User user, Long id, ReviewStatusRequest request) {
+        if (!REVIEW_STATUSES.contains(request.reviewStatus())) {
+            throw new com.example.studyvault.exception.InvalidReviewStatusException(request.reviewStatus());
+        }
+        Note note = findOwned(user, id);
+        note.setReviewStatus(request.reviewStatus());
         return response(notes.save(note));
     }
 
@@ -67,6 +93,16 @@ public class NoteService {
         Note note = findOwned(user, id);
         note.setStatus("trash");
         notes.save(note);
+    }
+
+    /** Permanently removes a note that is already in the owner's trash. */
+    @Transactional
+    public void permanentlyDelete(User user, Long id) {
+        Note note = findOwned(user, id);
+        // Keep this endpoint safe if it is called outside the Trash view: active notes are
+        // intentionally indistinguishable from missing notes instead of being hard deleted.
+        if (!"trash".equals(note.getStatus())) throw new NoteNotFoundException(id);
+        notes.delete(note);
     }
 
     /** Marks an owned note as a favorite. */

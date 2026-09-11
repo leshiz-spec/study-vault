@@ -6,6 +6,9 @@ backend/target/
 .env.*
 !.env.example
 !.env.production.example
+cookies.txt
+backend/cookies.txt
+studyvault_backup.sql
 .DS_Store
 *.log
 .idea/

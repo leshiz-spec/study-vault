@@ -15,6 +15,9 @@ public class NoteRevision {
     @JoinColumn(name = "note_id", nullable = false)
     private Note note;
 
+    @Column(nullable = false, length = 255)
+    private String title;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
@@ -27,6 +30,8 @@ public class NoteRevision {
     public Long getId() { return id; }
     public Note getNote() { return note; }
     public void setNote(Note note) { this.note = note; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
