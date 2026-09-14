@@ -5,7 +5,9 @@ import com.example.studyvault.entity.User;
 import com.example.studyvault.exception.UnauthorizedException;
 import com.example.studyvault.security.JwtAuthenticationFilter;
 import com.example.studyvault.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.net.URI;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
@@ -32,19 +34,20 @@ public class AuthController {
 
   @PostMapping("/register")
   public ResponseEntity<ApiResponse<UserResponse>> register(
-      @Valid @RequestBody RegisterRequest request) {
-    return withCookie(auth.register(request));
+      HttpServletRequest servletRequest, @Valid @RequestBody RegisterRequest request) {
+    return withCookie(auth.register(request), servletRequest);
   }
 
   @PostMapping("/login")
-  public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody LoginRequest request) {
-    return withCookie(auth.login(request));
+  public ResponseEntity<ApiResponse<UserResponse>> login(
+      HttpServletRequest servletRequest, @Valid @RequestBody LoginRequest request) {
+    return withCookie(auth.login(request), servletRequest);
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<ApiResponse<Void>> logout() {
+  public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request) {
     return ResponseEntity.ok()
-        .header("Set-Cookie", clearCookie().toString())
+        .header("Set-Cookie", clearCookie(request).toString())
         .body(ApiResponse.success(null));
   }
 
@@ -55,29 +58,47 @@ public class AuthController {
     return ApiResponse.success(UserResponse.from(user));
   }
 
-  private ResponseEntity<ApiResponse<UserResponse>> withCookie(AuthService.AuthResult result) {
+  private ResponseEntity<ApiResponse<UserResponse>> withCookie(
+      AuthService.AuthResult result, HttpServletRequest request) {
     return ResponseEntity.ok()
-        .header("Set-Cookie", cookie(result.token()).toString())
+        .header("Set-Cookie", cookie(result.token(), request).toString())
         .body(ApiResponse.success(result.user()));
   }
 
-  private ResponseCookie cookie(String token) {
+  private ResponseCookie cookie(String token, HttpServletRequest request) {
+    boolean crossSiteHttps = isCrossSiteHttpsRequest(request);
     return ResponseCookie.from(JwtAuthenticationFilter.COOKIE_NAME, token)
         .httpOnly(true)
-        .secure(secureCookie)
-        .sameSite("Lax")
+        .secure(secureCookie || crossSiteHttps)
+        .sameSite(crossSiteHttps ? "None" : "Lax")
         .path("/")
         .maxAge(86400)
         .build();
   }
 
-  private ResponseCookie clearCookie() {
+  private ResponseCookie clearCookie(HttpServletRequest request) {
+    boolean crossSiteHttps = isCrossSiteHttpsRequest(request);
     return ResponseCookie.from(JwtAuthenticationFilter.COOKIE_NAME, "")
         .httpOnly(true)
-        .secure(secureCookie)
-        .sameSite("Lax")
+        .secure(secureCookie || crossSiteHttps)
+        .sameSite(crossSiteHttps ? "None" : "Lax")
         .path("/")
         .maxAge(0)
         .build();
+  }
+
+  private boolean isCrossSiteHttpsRequest(HttpServletRequest request) {
+    String origin = request.getHeader("Origin");
+    if (origin == null || origin.isBlank()) return false;
+
+    try {
+      URI originUri = URI.create(origin);
+      String originHost = originUri.getHost();
+      return "https".equalsIgnoreCase(originUri.getScheme())
+          && originHost != null
+          && !originHost.equalsIgnoreCase(request.getServerName());
+    } catch (IllegalArgumentException ignored) {
+      return false;
+    }
   }
 }

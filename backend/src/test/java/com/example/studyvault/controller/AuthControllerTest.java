@@ -43,8 +43,37 @@ class AuthControllerTest {
                     "{\"username\":\"alice\",\"email\":\"a@example.com\",\"password\":\"secret123\"}"))
         .andExpect(status().isOk())
         .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+        .andExpect(header().string("Set-Cookie", containsString("SameSite=Lax")))
         .andExpect(jsonPath("$.data.username").value("alice"))
         .andExpect(content().string(not(containsString("password_hash"))));
+  }
+
+  @Test
+  void crossSiteHttpsLoginReturnsBrowserCompatibleCookie() throws Exception {
+    when(auth.login(any())).thenReturn(new AuthService.AuthResult(publicResponse(), "jwt-token"));
+
+    mvc.perform(
+            post("/api/auth/login")
+                .header("Origin", "https://study-vault-dun.vercel.app")
+                .header("Host", "study-vault-production.up.railway.app")
+                .contentType("application/json")
+                .content("{\"usernameOrEmail\":\"alice\",\"password\":\"secret123\"}"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Set-Cookie", containsString("SameSite=None")))
+        .andExpect(header().string("Set-Cookie", containsString("Secure")))
+        .andExpect(header().string("Set-Cookie", containsString("HttpOnly")));
+  }
+
+  @Test
+  void crossSiteHttpsLogoutClearsCookieWithMatchingAttributes() throws Exception {
+    mvc.perform(
+            post("/api/auth/logout")
+                .header("Origin", "https://study-vault-dun.vercel.app")
+                .header("Host", "study-vault-production.up.railway.app"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")))
+        .andExpect(header().string("Set-Cookie", containsString("SameSite=None")))
+        .andExpect(header().string("Set-Cookie", containsString("Secure")));
   }
 
   @Test
