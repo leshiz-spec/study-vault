@@ -65,6 +65,21 @@ class AuthControllerTest {
   }
 
   @Test
+  void localhostFrontendLoginToRemoteBackendReturnsCrossSiteCookie() throws Exception {
+    when(auth.login(any())).thenReturn(new AuthService.AuthResult(publicResponse(), "jwt-token"));
+
+    mvc.perform(
+            post("/api/auth/login")
+                .header("Origin", "http://localhost:5173")
+                .header("Host", "study-vault-production.up.railway.app")
+                .contentType("application/json")
+                .content("{\"usernameOrEmail\":\"alice\",\"password\":\"secret123\"}"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Set-Cookie", containsString("SameSite=None")))
+        .andExpect(header().string("Set-Cookie", containsString("Secure")));
+  }
+
+  @Test
   void crossSiteHttpsLogoutClearsCookieWithMatchingAttributes() throws Exception {
     mvc.perform(
             post("/api/auth/logout")

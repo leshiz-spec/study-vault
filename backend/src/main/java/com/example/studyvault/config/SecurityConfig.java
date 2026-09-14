@@ -63,10 +63,10 @@ public class SecurityConfig {
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 
-    configuration.setAllowedOrigins(
+    configuration.setAllowedOriginPatterns(
         List.of(
-            "http://localhost:5173",
-            "https://study-vault-dun.vercel.app"
+            "http://localhost:*",
+            "https://study-vault*.vercel.app"
         )
     );
 

@@ -66,36 +66,35 @@ public class AuthController {
   }
 
   private ResponseCookie cookie(String token, HttpServletRequest request) {
-    boolean crossSiteHttps = isCrossSiteHttpsRequest(request);
+    boolean crossSite = isCrossSiteRequest(request);
     return ResponseCookie.from(JwtAuthenticationFilter.COOKIE_NAME, token)
         .httpOnly(true)
-        .secure(secureCookie || crossSiteHttps)
-        .sameSite(crossSiteHttps ? "None" : "Lax")
+        .secure(secureCookie || crossSite)
+        .sameSite(crossSite ? "None" : "Lax")
         .path("/")
         .maxAge(86400)
         .build();
   }
 
   private ResponseCookie clearCookie(HttpServletRequest request) {
-    boolean crossSiteHttps = isCrossSiteHttpsRequest(request);
+    boolean crossSite = isCrossSiteRequest(request);
     return ResponseCookie.from(JwtAuthenticationFilter.COOKIE_NAME, "")
         .httpOnly(true)
-        .secure(secureCookie || crossSiteHttps)
-        .sameSite(crossSiteHttps ? "None" : "Lax")
+        .secure(secureCookie || crossSite)
+        .sameSite(crossSite ? "None" : "Lax")
         .path("/")
         .maxAge(0)
         .build();
   }
 
-  private boolean isCrossSiteHttpsRequest(HttpServletRequest request) {
+  private boolean isCrossSiteRequest(HttpServletRequest request) {
     String origin = request.getHeader("Origin");
     if (origin == null || origin.isBlank()) return false;
 
     try {
       URI originUri = URI.create(origin);
       String originHost = originUri.getHost();
-      return "https".equalsIgnoreCase(originUri.getScheme())
-          && originHost != null
+      return originHost != null
           && !originHost.equalsIgnoreCase(request.getServerName());
     } catch (IllegalArgumentException ignored) {
       return false;
