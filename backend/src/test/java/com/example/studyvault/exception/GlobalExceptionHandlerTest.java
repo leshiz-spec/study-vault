@@ -11,62 +11,69 @@ import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Controller;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 
 class GlobalExceptionHandlerTest {
-    private MockMvc mvc;
+  private MockMvc mvc;
 
-    @BeforeEach
-    void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new ErrorController())
-                .setControllerAdvice(new GlobalExceptionHandler()).build();
+  @BeforeEach
+  void setUp() {
+    mvc =
+        MockMvcBuilders.standaloneSetup(new ErrorController())
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
+  }
+
+  @Test
+  void handlesStableApplicationError() throws Exception {
+    mvc.perform(get("/test/note"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success", is(false)))
+        .andExpect(jsonPath("$.data").doesNotExist())
+        .andExpect(jsonPath("$.error.code", is("NOTE_NOT_FOUND")))
+        .andExpect(jsonPath("$.error.path", is("/test/note")));
+  }
+
+  @Test
+  void handlesBeanValidationErrors() throws Exception {
+    mvc.perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success", is(false)))
+        .andExpect(jsonPath("$.error.code", is("VALIDATION_ERROR")))
+        .andExpect(jsonPath("$.error.details.title").exists());
+  }
+
+  @Test
+  void handlesMalformedJsonBody() throws Exception {
+    mvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{bad"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code", is("MALFORMED_REQUEST")))
+        .andExpect(jsonPath("$.error.message", is("Malformed request body")));
+  }
+
+  @RestController
+  static class ErrorController {
+    @GetMapping("/test/note")
+    String note() {
+      throw new NoteNotFoundException(42L);
     }
 
-    @Test
-    void handlesStableApplicationError() throws Exception {
-        mvc.perform(get("/test/note"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.success", is(false)))
-                .andExpect(jsonPath("$.data").doesNotExist())
-                .andExpect(jsonPath("$.error.code", is("NOTE_NOT_FOUND")))
-                .andExpect(jsonPath("$.error.path", is("/test/note")));
+    @PostMapping("/test/validate")
+    String validate(@Valid @RequestBody Payload payload) {
+      return payload.title;
     }
+  }
 
-    @Test
-    void handlesBeanValidationErrors() throws Exception {
-        mvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success", is(false)))
-                .andExpect(jsonPath("$.error.code", is("VALIDATION_ERROR")))
-                .andExpect(jsonPath("$.error.details.title").exists());
-    }
-
-    @Test
-    void handlesMalformedJsonBody() throws Exception {
-        mvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{bad"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code", is("MALFORMED_REQUEST")))
-                .andExpect(jsonPath("$.error.message", is("Malformed request body")));
-    }
-
-    @RestController
-    static class ErrorController {
-        @GetMapping("/test/note")
-        String note() { throw new NoteNotFoundException(42L); }
-
-        @PostMapping("/test/validate")
-        String validate(@Valid @RequestBody Payload payload) { return payload.title; }
-    }
-
-    static class Payload {
-        @NotBlank(message = "title must not be blank")
-        public String title;
-    }
+  static class Payload {
+    @NotBlank(message = "title must not be blank")
+    public String title;
+  }
 }

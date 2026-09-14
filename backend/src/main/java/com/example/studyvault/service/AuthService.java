@@ -15,20 +15,39 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
-    private final UserRepository users; private final PasswordEncoder encoder; private final JwtService jwt;
-    public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt) { this.users = users; this.encoder = encoder; this.jwt = jwt; }
-    @Transactional
-    public AuthResult register(RegisterRequest request) {
-        if (users.existsByUsername(request.username())) throw new UsernameAlreadyExistsException();
-        if (users.existsByEmail(request.email())) throw new EmailAlreadyExistsException();
-        User user = new User(); user.setUsername(request.username()); user.setEmail(request.email()); user.setPasswordHash(encoder.encode(request.password()));
-        user = users.save(user); return new AuthResult(UserResponse.from(user), jwt.issue(user.getId(), user.getUsername()));
-    }
-    @Transactional(readOnly = true)
-    public AuthResult login(LoginRequest request) {
-        User user = users.findByUsername(request.usernameOrEmail()).or(() -> users.findByEmail(request.usernameOrEmail())).orElseThrow(UnauthorizedException::new);
-        if (!encoder.matches(request.password(), user.getPasswordHash())) throw new UnauthorizedException();
-        return new AuthResult(UserResponse.from(user), jwt.issue(user.getId(), user.getUsername()));
-    }
-    public record AuthResult(UserResponse user, String token) { }
+  private final UserRepository users;
+  private final PasswordEncoder encoder;
+  private final JwtService jwt;
+
+  public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt) {
+    this.users = users;
+    this.encoder = encoder;
+    this.jwt = jwt;
+  }
+
+  @Transactional
+  public AuthResult register(RegisterRequest request) {
+    if (users.existsByUsername(request.username())) throw new UsernameAlreadyExistsException();
+    if (users.existsByEmail(request.email())) throw new EmailAlreadyExistsException();
+    User user = new User();
+    user.setUsername(request.username());
+    user.setEmail(request.email());
+    user.setPasswordHash(encoder.encode(request.password()));
+    user = users.save(user);
+    return new AuthResult(UserResponse.from(user), jwt.issue(user.getId(), user.getUsername()));
+  }
+
+  @Transactional(readOnly = true)
+  public AuthResult login(LoginRequest request) {
+    User user =
+        users
+            .findByUsername(request.usernameOrEmail())
+            .or(() -> users.findByEmail(request.usernameOrEmail()))
+            .orElseThrow(UnauthorizedException::new);
+    if (!encoder.matches(request.password(), user.getPasswordHash()))
+      throw new UnauthorizedException();
+    return new AuthResult(UserResponse.from(user), jwt.issue(user.getId(), user.getUsername()));
+  }
+
+  public record AuthResult(UserResponse user, String token) {}
 }

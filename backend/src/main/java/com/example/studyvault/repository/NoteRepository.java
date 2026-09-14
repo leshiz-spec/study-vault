@@ -8,8 +8,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface NoteRepository extends JpaRepository<Note, Long>, JpaSpecificationExecutor<Note> {
-    List<Note> findAllByUserOrderByUpdatedAtDesc(User user);
-    List<Note> findAllByUserAndStatusOrderByUpdatedAtDesc(User user, String status);
-    List<Note> findAllByUserAndFavoriteOrderByUpdatedAtDesc(User user, boolean favorite);
-    Optional<Note> findByIdAndUser(Long id, User user);
+  List<Note> findAllByUserOrderByUpdatedAtDesc(User user);
+
+  List<Note> findAllByUserAndStatusOrderByUpdatedAtDesc(User user, String status);
+
+  List<Note> findAllByUserAndFavoriteOrderByUpdatedAtDesc(User user, boolean favorite);
+
+  Optional<Note> findByIdAndUser(Long id, User user);
 }

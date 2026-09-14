@@ -14,29 +14,45 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TagService {
-    private final TagRepository tags;
-    public TagService(TagRepository tags) { this.tags = tags; }
+  private final TagRepository tags;
 
-    @Transactional(readOnly = true)
-    public List<TagResponse> list(User user) { return tags.findAllByUserOrderByNameAsc(user).stream().map(TagResponse::from).toList(); }
+  public TagService(TagRepository tags) {
+    this.tags = tags;
+  }
 
-    @Transactional
-    public TagResponse create(User user, TagCreateRequest request) {
-        if (tags.findByUserAndName(user, request.name()).isPresent()) throw new TagAlreadyExistsException();
-        Tag tag = new Tag(); tag.setUser(user); tag.setName(request.name()); tag.setColor(request.color());
-        return TagResponse.from(tags.save(tag));
-    }
+  @Transactional(readOnly = true)
+  public List<TagResponse> list(User user) {
+    return tags.findAllByUserOrderByNameAsc(user).stream().map(TagResponse::from).toList();
+  }
 
-    @Transactional
-    public TagResponse update(User user, Long id, TagUpdateRequest request) {
-        Tag tag = findOwned(user, id);
-        if (!tag.getName().equals(request.name()) && tags.findByUserAndName(user, request.name()).isPresent()) throw new TagAlreadyExistsException();
-        tag.setName(request.name()); tag.setColor(request.color());
-        return TagResponse.from(tags.save(tag));
-    }
+  @Transactional
+  public TagResponse create(User user, TagCreateRequest request) {
+    if (tags.findByUserAndName(user, request.name()).isPresent())
+      throw new TagAlreadyExistsException();
+    Tag tag = new Tag();
+    tag.setUser(user);
+    tag.setName(request.name());
+    tag.setColor(request.color());
+    return TagResponse.from(tags.save(tag));
+  }
 
-    @Transactional
-    public void delete(User user, Long id) { tags.delete(findOwned(user, id)); }
+  @Transactional
+  public TagResponse update(User user, Long id, TagUpdateRequest request) {
+    Tag tag = findOwned(user, id);
+    if (!tag.getName().equals(request.name())
+        && tags.findByUserAndName(user, request.name()).isPresent())
+      throw new TagAlreadyExistsException();
+    tag.setName(request.name());
+    tag.setColor(request.color());
+    return TagResponse.from(tags.save(tag));
+  }
 
-    Tag findOwned(User user, Long id) { return tags.findByIdAndUser(id, user).orElseThrow(() -> new TagNotFoundException(id)); }
+  @Transactional
+  public void delete(User user, Long id) {
+    tags.delete(findOwned(user, id));
+  }
+
+  Tag findOwned(User user, Long id) {
+    return tags.findByIdAndUser(id, user).orElseThrow(() -> new TagNotFoundException(id));
+  }
 }

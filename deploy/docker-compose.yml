@@ -40,7 +40,15 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/api/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "http://127.0.0.1:8080/api/health",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -62,7 +70,8 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/api/health"]
+      test:
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5

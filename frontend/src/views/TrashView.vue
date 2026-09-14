@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { listTrash, permanentlyDeleteNote, restoreNote, type Note } from "../api";
+import {
+  listTrash,
+  permanentlyDeleteNote,
+  restoreNote,
+  type Note,
+} from "../api";
 
 const notes = ref<Note[]>([]);
 const loading = ref(true);
@@ -11,9 +16,15 @@ const SUMMARY_PREVIEW_LIMIT = 360;
 
 function previewContent(content: string) {
   return content
-    .replace(/<img\b[^>]*\balt="([^"]*)"[^>]*>/gi, (_, name: string) => `[Image: ${name || "embedded photo"}]`)
+    .replace(
+      /<img\b[^>]*\balt="([^"]*)"[^>]*>/gi,
+      (_, name: string) => `[Image: ${name || "embedded photo"}]`,
+    )
     .replace(/<img\b[^>]*>/gi, "[Image: embedded photo]")
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_, name: string) => `[Image: ${name || "embedded photo"}]`)
+    .replace(
+      /!\[([^\]]*)\]\([^)]*\)/g,
+      (_, name: string) => `[Image: ${name || "embedded photo"}]`,
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -26,7 +37,12 @@ function isExpanded(noteId: number, section: "content" | "summary") {
 function isLong(text: string | null | undefined, limit: number) {
   return Boolean(text && text.length > limit);
 }
-function excerpt(text: string | null | undefined, limit: number, noteId: number, section: "content" | "summary") {
+function excerpt(
+  text: string | null | undefined,
+  limit: number,
+  noteId: number,
+  section: "content" | "summary",
+) {
   const value = text || "";
   if (!isLong(value, limit) || isExpanded(noteId, section)) return value;
   return `${value.slice(0, limit).trimEnd()}…`;
@@ -44,7 +60,10 @@ async function load() {
   try {
     const result = await listTrash();
     expandedSections.value = new Set();
-    notes.value = result.map((note) => ({ ...note, content: previewContent(note.content) }));
+    notes.value = result.map((note) => ({
+      ...note,
+      content: previewContent(note.content),
+    }));
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Unable to load trash";
   } finally {
@@ -60,12 +79,18 @@ async function restore(note: Note) {
   }
 }
 async function permanentlyDelete(note: Note) {
-  if (!window.confirm(`Permanently delete “${note.title}”? This cannot be undone.`)) return;
+  if (
+    !window.confirm(
+      `Permanently delete “${note.title}”? This cannot be undone.`,
+    )
+  )
+    return;
   try {
     await permanentlyDeleteNote(note.id);
     notes.value = notes.value.filter((item) => item.id !== note.id);
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Unable to permanently delete note";
+    error.value =
+      e instanceof Error ? e.message : "Unable to permanently delete note";
   }
 }
 onMounted(load);
@@ -93,7 +118,16 @@ onMounted(load);
       <article v-for="note in notes" :key="note.id" class="note-card">
         <div class="note-main">
           <h2>{{ note.title }}</h2>
-          <p>{{ excerpt(note.content || "No content", NOTE_PREVIEW_LIMIT, note.id, "content") }}</p>
+          <p>
+            {{
+              excerpt(
+                note.content || "No content",
+                NOTE_PREVIEW_LIMIT,
+                note.id,
+                "content",
+              )
+            }}
+          </p>
           <span
             v-if="isLong(note.content, NOTE_PREVIEW_LIMIT)"
             class="view-more-link"
@@ -107,7 +141,9 @@ onMounted(load);
           </span>
           <p v-if="note.summary" class="note-summary-preview">
             <strong>Summary:</strong>
-            {{ excerpt(note.summary, SUMMARY_PREVIEW_LIMIT, note.id, "summary") }}
+            {{
+              excerpt(note.summary, SUMMARY_PREVIEW_LIMIT, note.id, "summary")
+            }}
           </p>
           <span
             v-if="isLong(note.summary, SUMMARY_PREVIEW_LIMIT)"
@@ -121,9 +157,21 @@ onMounted(load);
             {{ isExpanded(note.id, "summary") ? "View less" : "View more" }}
           </span>
         </div>
-        <div class="note-card-actions">
-          <button class="restore-link" @click="restore(note)">Restore</button>
-          <button class="danger-link" @click="permanentlyDelete(note)">Delete permanently</button>
+        <div class="note-card-actions trash-note-actions">
+          <button
+            type="button"
+            class="button secondary trash-action-button"
+            @click="restore(note)"
+          >
+            Restore
+          </button>
+          <button
+            type="button"
+            class="button secondary trash-action-button trash-delete-button"
+            @click="permanentlyDelete(note)"
+          >
+            <span>Delete</span><span>permanently</span>
+          </button>
         </div>
       </article>
     </section>

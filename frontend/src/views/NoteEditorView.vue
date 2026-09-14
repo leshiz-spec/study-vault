@@ -21,6 +21,7 @@ import {
 } from "../api";
 import { useAuthStore } from "../stores/auth";
 import { hasShortcutModifier, shortcutModifier } from "../keyboard";
+import { tagColor as colorForTag } from "../tagPalette";
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
@@ -52,29 +53,15 @@ const renderedMarkdown = computed(() =>
 );
 const renderedRevisionMarkdown = computed(() =>
   selectedRevision.value
-    ? DOMPurify.sanitize(marked.parse(selectedRevision.value.content, { async: false }) as string)
+    ? DOMPurify.sanitize(
+        marked.parse(selectedRevision.value.content, {
+          async: false,
+        }) as string,
+      )
     : "",
 );
-const palette: Record<string, string> = {
-  Red: "#ef4444",
-  Orange: "#f97316",
-  Amber: "#f59e0b",
-  Yellow: "#eab308",
-  Lime: "#84cc16",
-  Green: "#22c55e",
-  Teal: "#14b8a6",
-  Cyan: "#06b6d4",
-  "Sky Blue": "#0ea5e9",
-  Blue: "#3b82f6",
-  Indigo: "#6366f1",
-  Violet: "#8b5cf6",
-  Purple: "#a855f7",
-  Pink: "#ec4899",
-  Rose: "#f43f5e",
-  Slate: "#64748b",
-};
 function tagColor(tag?: Tag) {
-  return palette[tag?.color || "Blue"] || "#1769aa";
+  return colorForTag(tag?.color);
 }
 let persistedTitle = "";
 let persistedContent = "";
@@ -292,10 +279,14 @@ async function loadRevisions() {
   try {
     revisions.value = await listNoteRevisions(id);
     if (selectedRevision.value) {
-      selectedRevision.value = revisions.value.find((revision) => revision.id === selectedRevision.value?.id) || null;
+      selectedRevision.value =
+        revisions.value.find(
+          (revision) => revision.id === selectedRevision.value?.id,
+        ) || null;
     }
   } catch (e) {
-    revisionError.value = e instanceof Error ? e.message : "Unable to load version history";
+    revisionError.value =
+      e instanceof Error ? e.message : "Unable to load version history";
   } finally {
     revisionLoading.value = false;
   }
@@ -305,7 +296,12 @@ function selectRevision(revision: NoteRevision) {
 }
 async function restoreRevision() {
   if (!id || !selectedRevision.value) return;
-  if (!window.confirm(`Restore version from ${formatRevisionDate(selectedRevision.value.createdAt)}?`)) return;
+  if (
+    !window.confirm(
+      `Restore version from ${formatRevisionDate(selectedRevision.value.createdAt)}?`,
+    )
+  )
+    return;
   restoringRevision.value = true;
   revisionError.value = "";
   try {
@@ -319,7 +315,8 @@ async function restoreRevision() {
     await loadRevisions();
     selectedRevision.value = null;
   } catch (e) {
-    revisionError.value = e instanceof Error ? e.message : "Unable to restore version";
+    revisionError.value =
+      e instanceof Error ? e.message : "Unable to restore version";
   } finally {
     restoringRevision.value = false;
   }
@@ -340,7 +337,8 @@ async function generateSummary() {
     summaryDraft.value = saved.summary || result.summary;
     summarySaved.value = true;
   } catch (e) {
-    summaryError.value = e instanceof Error ? e.message : "Unable to generate and save summary";
+    summaryError.value =
+      e instanceof Error ? e.message : "Unable to generate and save summary";
   } finally {
     summaryLoading.value = false;
     summarySaving.value = false;
@@ -409,8 +407,12 @@ async function save() {
         persistedReviewStatus = reviewStatus.value;
       }
     } else {
-      const created = await createNote({ title: title.value, content: content.value });
-      if (reviewStatus.value !== "not_started") await updateNoteReviewStatus(created.id, reviewStatus.value);
+      const created = await createNote({
+        title: title.value,
+        content: content.value,
+      });
+      if (reviewStatus.value !== "not_started")
+        await updateNoteReviewStatus(created.id, reviewStatus.value);
     }
     manuallySaved.value = true;
     localStorage.removeItem(draftKey());
@@ -473,7 +475,9 @@ watch([title, content], scheduleAutosave);
           }}
         </p>
         <div class="shortcut-hints" aria-label="Keyboard shortcuts">
-          <span v-if="id"><kbd>{{ shortcutModifier }} S</kbd> Save note</span>
+          <span v-if="id"
+            ><kbd>{{ shortcutModifier }} S</kbd> Save note</span
+          >
           <span><kbd>Esc</kbd> Close preview</span>
         </div>
       </div>
@@ -665,7 +669,11 @@ watch([title, content], scheduleAutosave);
         v-html="renderedMarkdown"
         aria-label="Markdown preview"
       ></div>
-      <section v-if="id" class="revision-panel" aria-label="Note version history">
+      <section
+        v-if="id"
+        class="revision-panel"
+        aria-label="Note version history"
+      >
         <div class="revision-header">
           <div>
             <strong>Version History</strong>
@@ -673,8 +681,12 @@ watch([title, content], scheduleAutosave);
           </div>
         </div>
         <p v-if="revisionError" class="error">{{ revisionError }}</p>
-        <p v-if="revisionLoading" class="autosave-indicator autosave-saving">Loading history...</p>
-        <p v-else-if="!revisions.length" class="revision-empty">No earlier versions yet. Edit and save this note to create one.</p>
+        <p v-if="revisionLoading" class="autosave-indicator autosave-saving">
+          Loading history...
+        </p>
+        <p v-else-if="!revisions.length" class="revision-empty">
+          No earlier versions yet. Edit and save this note to create one.
+        </p>
         <div v-else class="revision-layout">
           <div class="revision-list">
             <button
@@ -692,8 +704,16 @@ watch([title, content], scheduleAutosave);
           <div v-if="selectedRevision" class="revision-preview">
             <span class="revision-label">Historical version</span>
             <h3>{{ selectedRevision.title }}</h3>
-            <div class="markdown-preview" v-html="renderedRevisionMarkdown"></div>
-            <button type="button" class="button" :disabled="restoringRevision" @click="restoreRevision">
+            <div
+              class="markdown-preview"
+              v-html="renderedRevisionMarkdown"
+            ></div>
+            <button
+              type="button"
+              class="button"
+              :disabled="restoringRevision"
+              @click="restoreRevision"
+            >
               {{ restoringRevision ? "Restoring..." : "Restore this version" }}
             </button>
           </div>
@@ -724,8 +744,14 @@ watch([title, content], scheduleAutosave);
           aria-label="Generated summary"
         ></textarea>
         <div v-if="summaryDraft" class="summary-actions">
-          <span v-if="summarySaved" class="autosave-indicator autosave-saved">Summary saved.</span>
-          <span v-else-if="summarySaving" class="autosave-indicator autosave-saving">Saving summary...</span>
+          <span v-if="summarySaved" class="autosave-indicator autosave-saved"
+            >Summary saved.</span
+          >
+          <span
+            v-else-if="summarySaving"
+            class="autosave-indicator autosave-saving"
+            >Saving summary...</span
+          >
         </div>
       </section>
       <div class="editor-actions">

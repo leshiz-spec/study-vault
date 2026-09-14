@@ -15,6 +15,7 @@ import {
   type Tag,
 } from "../api";
 import { shortcutModifier } from "../keyboard";
+import { tagColor as colorForTag } from "../tagPalette";
 const router = useRouter();
 const notes = ref<Note[]>([]);
 const tags = ref<Tag[]>([]);
@@ -35,26 +36,8 @@ const transferError = ref("");
 const expandedSections = ref<Set<string>>(new Set());
 const NOTE_PREVIEW_LIMIT = 280;
 const SUMMARY_PREVIEW_LIMIT = 360;
-const palette: Record<string, string> = {
-  Red: "#ef4444",
-  Orange: "#f97316",
-  Amber: "#f59e0b",
-  Yellow: "#eab308",
-  Lime: "#84cc16",
-  Green: "#22c55e",
-  Teal: "#14b8a6",
-  Cyan: "#06b6d4",
-  "Sky Blue": "#0ea5e9",
-  Blue: "#3b82f6",
-  Indigo: "#6366f1",
-  Violet: "#8b5cf6",
-  Purple: "#a855f7",
-  Pink: "#ec4899",
-  Rose: "#f43f5e",
-  Slate: "#64748b",
-};
 function tagColor(tag?: Tag) {
-  return palette[tag?.color || "Blue"] || "#1769aa";
+  return colorForTag(tag?.color);
 }
 function previewContent(content: string) {
   return content
@@ -97,11 +80,7 @@ function toggleExpanded(noteId: number, section: "content" | "summary") {
   expandedSections.value = next;
 }
 const hasSearch = computed(() =>
-  Boolean(
-    search.value.trim() ||
-      selectedTag.value ||
-      favoriteOnly.value,
-  ),
+  Boolean(search.value.trim() || selectedTag.value || favoriteOnly.value),
 );
 async function load(resetPage = false) {
   if (resetPage) page.value = 0;
@@ -194,7 +173,8 @@ async function downloadSingle(note: Note) {
     saveDownload(await exportNote(note.id));
     transferState.value = "Note exported successfully.";
   } catch (e) {
-    transferError.value = e instanceof Error ? e.message : "Unable to export note";
+    transferError.value =
+      e instanceof Error ? e.message : "Unable to export note";
   }
 }
 async function downloadAll() {
@@ -204,7 +184,8 @@ async function downloadAll() {
     saveDownload(await exportAllNotes());
     transferState.value = "All notes exported successfully.";
   } catch (e) {
-    transferError.value = e instanceof Error ? e.message : "Unable to export notes";
+    transferError.value =
+      e instanceof Error ? e.message : "Unable to export notes";
   }
 }
 function openImportPicker() {
@@ -230,7 +211,8 @@ async function handleImport(event: Event) {
     transferState.value = "Markdown note imported successfully.";
     await load(true);
   } catch (e) {
-    transferError.value = e instanceof Error ? e.message : "Unable to import Markdown file";
+    transferError.value =
+      e instanceof Error ? e.message : "Unable to import Markdown file";
   }
 }
 function formatDate(value?: string) {
@@ -245,14 +227,14 @@ function focusSearch() {
   searchInput.value?.focus();
   searchInput.value?.select();
 }
-watch([search, selectedTag, favoriteOnly, sort, size], () =>
-  load(true),
-);
+watch([search, selectedTag, favoriteOnly, sort, size], () => load(true));
 onMounted(async () => {
   window.addEventListener("studyvault:focus-search", focusSearch);
   await Promise.all([loadTags(), load()]);
 });
-onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSearch));
+onUnmounted(() =>
+  window.removeEventListener("studyvault:focus-search", focusSearch),
+);
 </script>
 <template>
   <main class="notes-page">
@@ -262,14 +244,32 @@ onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSea
         <h1>Notes</h1>
         <p>Capture ideas, lessons, and everything worth remembering.</p>
         <div class="shortcut-hints" aria-label="Keyboard shortcuts">
-          <span><kbd>{{ shortcutModifier }} K</kbd> Search</span>
-          <span><kbd>{{ shortcutModifier }} N</kbd> New note</span>
+          <span
+            ><kbd>{{ shortcutModifier }} K</kbd> Search</span
+          >
+          <span
+            ><kbd>{{ shortcutModifier }} N</kbd> New note</span
+          >
         </div>
       </div>
       <div class="notes-actions">
-        <input ref="importInput" class="visually-hidden" type="file" accept=".md,text/markdown,text/plain" @change="handleImport" />
-        <button class="button secondary" type="button" @click="openImportPicker">Import Markdown</button>
-        <button class="button secondary" type="button" @click="downloadAll">Export All</button>
+        <input
+          ref="importInput"
+          class="visually-hidden"
+          type="file"
+          accept=".md,text/markdown,text/plain"
+          @change="handleImport"
+        />
+        <button
+          class="button secondary"
+          type="button"
+          @click="openImportPicker"
+        >
+          Import Markdown
+        </button>
+        <button class="button secondary" type="button" @click="downloadAll">
+          Export All
+        </button>
         <RouterLink class="button secondary" to="/tags">Manage tags</RouterLink
         ><RouterLink class="button" to="/notes/new">New note</RouterLink>
       </div>
@@ -292,8 +292,7 @@ onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSea
             {{ tag.name }}
           </option>
         </select></label
-      ><label
-        class="checkbox-filter"
+      ><label class="checkbox-filter"
         ><input v-model="favoriteOnly" type="checkbox" /> Favorites</label
       ><label
         ><span>Sort</span
@@ -365,7 +364,16 @@ onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSea
           @keydown.space.prevent="router.push(`/notes/${note.id}`)"
         >
           <h2>{{ note.title }}</h2>
-          <p>{{ excerpt(note.content || "No content", NOTE_PREVIEW_LIMIT, note.id, "content") }}</p>
+          <p>
+            {{
+              excerpt(
+                note.content || "No content",
+                NOTE_PREVIEW_LIMIT,
+                note.id,
+                "content",
+              )
+            }}
+          </p>
           <span
             v-if="isLong(note.content, NOTE_PREVIEW_LIMIT)"
             class="view-more-link"
@@ -379,7 +387,9 @@ onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSea
           </span>
           <p v-if="note.summary" class="note-summary-preview">
             <strong>Summary:</strong>
-            {{ excerpt(note.summary, SUMMARY_PREVIEW_LIMIT, note.id, "summary") }}
+            {{
+              excerpt(note.summary, SUMMARY_PREVIEW_LIMIT, note.id, "summary")
+            }}
           </p>
           <span
             v-if="isLong(note.summary, SUMMARY_PREVIEW_LIMIT)"
@@ -441,9 +451,23 @@ onUnmounted(() => window.removeEventListener("studyvault:focus-search", focusSea
             {{ note.favorite ? "★" : "☆" }}
           </button>
           <div class="note-edit-actions">
-            <button class="export-link" type="button" @click.stop="downloadSingle(note)">Export</button
-            ><RouterLink :to="`/notes/${note.id}`">Edit</RouterLink
-            ><button class="danger-link" @click="remove(note)">Delete</button>
+            <button
+              class="button secondary note-action-button"
+              type="button"
+              @click.stop="downloadSingle(note)"
+            >
+              Export</button
+            ><RouterLink
+              class="button secondary note-action-button"
+              :to="`/notes/${note.id}`"
+              >Edit</RouterLink
+            ><button
+              class="button secondary note-action-button note-delete-button"
+              type="button"
+              @click="remove(note)"
+            >
+              Delete
+            </button>
           </div>
         </div>
       </article>
