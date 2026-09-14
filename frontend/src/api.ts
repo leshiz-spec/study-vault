@@ -1,3 +1,4 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export type ApiError = Error & { code?: string };
 export type Note = {
   id: number;
@@ -54,7 +55,7 @@ export async function apiRequest<T>(
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type"))
     headers.set("Content-Type", "application/json");
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
     headers,
     credentials: "include",
@@ -195,7 +196,7 @@ export async function downloadFile(
   path: string,
   fallbackName: string,
 ): Promise<{ blob: Blob; filename: string }> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -226,7 +227,7 @@ export async function downloadFile(
 export async function importMarkdown(file: File): Promise<Note> {
   const form = new FormData();
   form.append("file", file);
-  const response = await fetch("/api/notes/import", {
+  const response = await fetch(`${API_BASE_URL}/api/notes/import`, {
     method: "POST",
     body: form,
     credentials: "include",
